@@ -176,6 +176,14 @@ if __name__ == '__main__':
         "eps-min" + str(eps_min).replace(".", "p")
 
 
+    #Create needed directories if they do not exist
+    if not os.path.isdir('plots'):
+        os.mkdir('plots')
+    if not os.path.isdir('last_runs'):
+        os.mkdir('last_runs')
+    if not os.path.isdir('checkpoints'):
+        os.mkdir('checkpoints')
+
     plot_filename = 'plots/' + env_name + "_" + exp_exp_strategy_filename + "_"
     last_run_filename = 'last_runs/' + env_name+"_"+exp_exp_strategy_filename+"_last_run.txt"
     last_run_replay_memory_filename = 'last_runs/' + env_name+"_"+exp_exp_strategy_filename+"_last_run_replay_memory.bin"
@@ -226,6 +234,7 @@ if __name__ == '__main__':
     n_eval_eps = 50
     max_ep_steps = 100
     max_eval_ep_steps = 100
+    ep_render_step = 100
 
     for ep in range(ep, n_eps):
 
@@ -309,7 +318,7 @@ if __name__ == '__main__':
                 #print("Ep-N: {}, Ep-Steps: {}, Tot-Ep-R: {:.5f}, Avg-R-100-EP: {:.5f},Avg-R-10-EP: {:.5f}, Avg-R-{}-EP: {:.5f}, Max-R: {:.3f}, Var-R: {:.3f}, STD-R: {:.3f}, EPS:{:.5f}, EPS_VDBE_R_MT_LT:{:.5f}, EPS_VDBE_R_MT_LT_MTR:{:.2f}, EPS_VDBE_R_MT_LT_LTR:{:.2f}".format(ep, ep_steps, total_reward_per_ep,  rewards_dict["avg_100_ep"], rewards_dict["avg_10_ep"], ep, rewards_dict["avg_tot_ep"], rewards_dict["max"], rewards_dict["variance"], rewards_dict["std"], ddpgAgent.eps, ddpgAgent.eps_vdbe_mt_lt, rewards_dict["mt"], rewards_dict["lt"]))
                 print("Ep-N: {}, Ep-Steps: {}, Tot-Ep-R: {:.5f}, Avg-R-100-EP: {:.5f},Avg-R-10-EP: {:.5f}, Avg-R-{}-EP: {:.5f}, EPS:{:.5f}".format(ep, ep_steps, total_reward_per_ep,  rewards_dict["avg_100_ep"], rewards_dict["avg_10_ep"], ep, rewards_dict["avg_tot_ep"], ddpgAgent.eps))
                 print("Input [S or s] to STOP - [P or p] to PAUSE")
-            if ep % 100 == 0:
+            if ep % ep_render_step == 0:
                 env.render()
 
         # if ep == 0 and init_max_reward:
