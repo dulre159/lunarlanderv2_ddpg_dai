@@ -125,6 +125,42 @@ def plot_running_mean_of_rewards_history(plot_filename, ep, tot_ep_reward_histor
     x = [i + 1 for i in range(ep)]
     plot_learning_curve(x, tot_ep_reward_history, pf)
 
+def save_everything(ddpgAgent, last_run_replay_memory_filename, last_run_filename, plot_filename, ep, n_eps, rewards_dict, tot_ep_reward_history, tot_eval_ep_avg_reward_history):
+  print("--- Starting Saving Phase ---")
+  print("Saving models...")
+  ddpgAgent.save_models_checkpoints_to_disk()
+
+  save_last_run_replay_memory(last_run_replay_memory_filename, ddpgAgent)
+  save_last_run_info(last_run_filename, ep, n_eps, rewards_dict, ddpgAgent, tot_ep_reward_history, tot_eval_ep_avg_reward_history)
+  print("--- End Of Saving Phase ---")
+
+def do_evaluation(ddpgAgent, n_eval_eps, env, rewards_dict, max_eval_ep_steps, tot_eval_ep_avg_reward_history):
+  print("--- Starting Evaluation Phase ---")
+  tot_eval_eps_reward = 0
+  for eep in range(0, n_eval_eps):
+      eval_obs = env.reset()
+      eval_done = False
+      total_eval_ep_reward = 0
+      eval_ep_steps = 0
+      while not eval_done:
+          eval_action = ddpgAgent.get_action(eval_obs, rewards_dict)
+          eval_next_observation, eval_reward, eval_done, eval_info = env.step(eval_action)
+          eval_obs = eval_next_observation
+          total_eval_ep_reward += eval_reward
+          eval_ep_steps +=1
+
+          # To speed up evaluation max number of steps are 400
+          if eval_ep_steps == max_eval_ep_steps:
+              eval_done = True
+
+          if eval_done:
+              print("Eval-EP: {}, TOT-R: {}, STEPS: {}".format(eep, total_eval_ep_reward, eval_ep_steps))
+          #env.render()
+      tot_eval_eps_reward += total_eval_ep_reward
+  print("--- End Of Evaluation Phase ---")
+  tot_eval_ep_avg_reward_history.append((tot_eval_eps_reward/n_eval_eps))
+  print("Eval-EPS-AVG: {},".format((tot_eval_eps_reward/n_eval_eps)))
+
 
 if __name__ == '__main__':
 
@@ -223,7 +259,7 @@ if __name__ == '__main__':
         eps_dec=eps_dec
         )
     steps = 0
-    n_eps = 1000 if not load_last_run_from_disk or last_run_information is None else last_run_information[1]
+    n_eps = 250 if not load_last_run_from_disk or last_run_information is None else last_run_information[1]
     ep = 0 if not load_last_run_from_disk or last_run_information is None else last_run_information[0]
     tot_ep_reward_history = [] if not load_last_run_from_disk or last_run_information is None else last_run_information[3]
     tot_eval_ep_avg_reward_history = [] if not load_last_run_from_disk or last_run_information is None else last_run_information[4]
@@ -232,68 +268,28 @@ if __name__ == '__main__':
     save_ep = 50
     eval_ep = 50
     n_eval_eps = 50
-    max_ep_steps = 100
-    max_eval_ep_steps = 100
+    max_ep_steps = 400
+    max_eval_ep_steps = 400
     ep_render_step = 100
 
     for ep in range(ep, n_eps):
 
         # Save step
         if ep % save_ep == 0:
-            print("--- Starting Saving Phase ---")
-            print("Saving models...")
-            ddpgAgent.save_models_checkpoints_to_disk()
-
-            save_last_run_replay_memory(last_run_replay_memory_filename, ddpgAgent)
-            save_last_run_info(last_run_filename, ep, n_eps, rewards_dict, ddpgAgent, tot_ep_reward_history, tot_eval_ep_avg_reward_history)
-
+            save_everything(ddpgAgent, last_run_replay_memory_filename, last_run_filename, plot_filename, ep, n_eps,
+                                rewards_dict, tot_ep_reward_history, tot_eval_ep_avg_reward_history)
             plot_running_mean_of_rewards_history(plot_filename, ep, tot_ep_reward_history)
-
-            print("--- End Of Saving Phase ---")
-
 
         #Evaluation step
         if ep % eval_ep == 0:
-            print("--- Starting Evaluation Phase ---")
-            tot_eval_eps_reward = 0
-            for eep in range(0, n_eval_eps):
-                eval_obs = env.reset()
-                eval_done = False
-                total_eval_ep_reward = 0
-                eval_ep_steps = 0
-                while not eval_done:
-                    eval_action = ddpgAgent.get_action(eval_obs, rewards_dict)
-                    eval_next_observation, eval_reward, eval_done, eval_info = env.step(eval_action)
-                    eval_obs = eval_next_observation
-                    total_eval_ep_reward += eval_reward
-                    eval_ep_steps +=1
-
-                    # To speed up evaluation max number of steps are 400
-                    if eval_ep_steps == max_eval_ep_steps:
-                        eval_done = True
-
-                    if eval_done:
-                        print("Eval-EP: {}, TOT-R: {}, STEPS: {}".format(eep, total_eval_ep_reward, eval_ep_steps))
-                    env.render()
-                tot_eval_eps_reward += total_eval_ep_reward
-            print("--- End Of Evaluation Phase ---")
-            tot_eval_ep_avg_reward_history.append((tot_eval_eps_reward/n_eval_eps))
-            print("Eval-EPS-AVG: {},".format((tot_eval_eps_reward/n_eval_eps)))
+            do_evaluation(ddpgAgent, n_eval_eps, env, rewards_dict, max_eval_ep_steps, tot_eval_ep_avg_reward_history)
 
 
         # In case user wants to stop the training
         if user_input is not None and len(user_input) > 0 and user_input[0] is not None and len(user_input[0]) > 0 and (user_input[0][0]).lower() == 's':
-            # Save rewards history; total number of episodes; current ep number
-            save_last_run_info(last_run_filename, ep, n_eps, rewards_dict, ddpgAgent, tot_ep_reward_history,
-                               tot_eval_ep_avg_reward_history)
-            # Save replay memory to disk
-            save_last_run_replay_memory(last_run_replay_memory_filename, ddpgAgent)
-            # Save agent models checkpoint
-            print("Saving models...")
-            ddpgAgent.save_models_checkpoints_to_disk()
-
+            save_everything(ddpgAgent, last_run_replay_memory_filename, last_run_filename, plot_filename, ep, n_eps,
+                            rewards_dict, tot_ep_reward_history, tot_eval_ep_avg_reward_history)
             plot_running_mean_of_rewards_history(plot_filename, ep, tot_ep_reward_history)
-
             break
 
         total_reward_per_ep = 0
@@ -341,6 +337,9 @@ if __name__ == '__main__':
         # if len(tot_ep_reward_history) >= 2:
         #     rewards_dict["variance"] = statistics.variance(tot_ep_reward_history)
         #     rewards_dict["std"] = math.sqrt(rewards_dict["variance"])
+    do_evaluation(ddpgAgent, n_eval_eps, env, rewards_dict, max_eval_ep_steps, tot_eval_ep_avg_reward_history)
+    save_everything(ddpgAgent, last_run_replay_memory_filename, last_run_filename, plot_filename, ep, n_eps,
+                    rewards_dict, tot_ep_reward_history, tot_eval_ep_avg_reward_history)
     plot_running_mean_of_rewards_history(plot_filename, ep, tot_ep_reward_history)
 
 # if __name__ == '__main__':
