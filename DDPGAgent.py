@@ -10,7 +10,7 @@ import os.path
 
 class DDPGAgent():
     def __init__(self, env, actor_model_name, actor_target_model_name, critic_model_name, critic_target_model_name, replay_memory,
-                 exp_exp_strategy_name="", load_models_from_disk=False, minibatch_size=128, discount_rate=0.99, tau=1e-2,
+                 exp_exp_strategy_name="", load_models_from_disk=False, minibatch_size=256, discount_rate=0.99, tau=1e-2,
                  actor_learning_rate=1e-04, critic_learning_rate=1e-03, eps_init=1.0, eps_min=0.01, eps_dec=0.0009,
                  memory_size=100000, gnoisestd = 0.1, eps_vdbe_mt_lt=1, eps_vdbe_mt_lt_mt_tau=2, eps_vdbe_mt_lt_lt_tau=2,
                  eps_vdbe_mt_lt_boltz_tau=5):
@@ -60,11 +60,11 @@ class DDPGAgent():
         self.build_models()
 
     def build_models(self):
-        self.actor_model = ActorNetwork(self.actor_learning_rate, self.os_shape[0], 400, 300, self.as_shape[0], self.actor_model_name)
-        self.actor_target_model = ActorNetwork(self.actor_learning_rate, self.os_shape[0], 400, 300, self.as_shape[0], self.actor_target_model_name)
+        self.actor_model = ActorNetwork(self.actor_learning_rate, self.os_shape[0], 200, 150, self.as_shape[0], self.actor_model_name)
+        self.actor_target_model = ActorNetwork(self.actor_learning_rate, self.os_shape[0], 200, 150, self.as_shape[0], self.actor_target_model_name)
 
-        self.critic_model = CriticNetwork(self.critic_learning_rate, self.os_shape[0], 400, 300, self.as_shape[0], self.critic_model_name)
-        self.critic_target_model = CriticNetwork(self.critic_learning_rate, self.os_shape[0], 400, 300, self.as_shape[0], self.critic_target_model_name)
+        self.critic_model = CriticNetwork(self.critic_learning_rate, self.os_shape[0], 200, 150, self.as_shape[0], self.critic_model_name)
+        self.critic_target_model = CriticNetwork(self.critic_learning_rate, self.os_shape[0], 200, 150, self.as_shape[0], self.critic_target_model_name)
 
         if self.load_models_from_disk and os.path.isfile(self.critic_model_name) and os.path.isfile(self.critic_target_model_name) and os.path.isfile(self.actor_model_name) and os.path.isfile(self.actor_target_model_name):
             self.actor_model.load_checkpoint()
@@ -111,14 +111,25 @@ class DDPGAgent():
         # Generate random action
         random_action = torch.from_numpy(np.random.uniform(self.as_low,self.as_high, (1, self.as_shape[0])))
         # Get greedy action
-        greedy_action = self.actor_model(observation)
+        #greedy_action = self.actor_model(observation)
+        self.actor_model.eval()
+        with torch.no_grad():
+            greedy_action = self.actor_model(observation)
+
         return random_action if random_num <= self.eps else greedy_action
+
+    def get_random_action(self, observation):
+        # Generate random action
+        random_action = torch.from_numpy(np.random.uniform(self.as_low,self.as_high, (1, self.as_shape[0])))
+        return random_action
 
     def get_constant_noise_action(self, observation):
         # Generate gaussian noise
         gaussian_noise = torch.normal(mean=0, std=self.gnoisestd, size=(1,self.as_shape[0])).to(self.device)
         # Get greedy action
-        greedy_action = self.actor_model(observation)
+        self.actor_model.eval()
+        with torch.no_grad():
+            greedy_action = self.actor_model(observation)
         # Add noise
         noisy_action = gaussian_noise + greedy_action
         # Clamp action
@@ -129,9 +140,11 @@ class DDPGAgent():
         # Generate gaussian noise
         gaussian_noise = torch.normal(mean=0, std=self.gnoisestd, size=(1, self.as_shape[0])).to(self.device)
         # Get greedy action
-        greedy_action = self.actor_model(observation)
+        self.actor_model.eval()
+        with torch.no_grad():
+            greedy_action = self.actor_model(observation)
         # Add noise
-        noisy_action = gaussian_noise + greedy_action
+        noisy_action = gaussian_noise*self.eps + greedy_action
         # Clamp action
         noisy_action = torch.clip(noisy_action, self.as_low_tensor, self.as_high_tensor)
         return noisy_action
@@ -139,39 +152,61 @@ class DDPGAgent():
     def get_action(self, observation, rewards_dict):
         observation = torch.from_numpy(observation).float().unsqueeze(0).to(self.device)
         # Default strategy is greedy
-        action = self.actor_model(observation)
+        #action = self.actor_model(observation)
 
         # If a strategy is selected
         if self.exp_exp_strategy_name == "just_gnoise":
             action = self.get_constant_noise_action(observation)
-        if self.exp_exp_strategy_name == "gnoise_eps-decay":
+        elif self.exp_exp_strategy_name == "gnoise_eps-decay":
             action = self.get_constant_noise_action_eps_dependant(observation)
-        if self.exp_exp_strategy_name == "eps_greedy":
+        elif self.exp_exp_strategy_name == "eps_greedy":
             action = self.get_eps_greedy_action(observation)
-        if self.exp_exp_strategy_name == "eps_greedy_eps-decay":
+        elif self.exp_exp_strategy_name == "eps_greedy_eps-decay":
             action = self.get_eps_greedy_action(observation)
+        elif self.exp_exp_strategy_name == "random":
+            action = self.get_random_action(observation)
+        else:
+            self.actor_model.eval()
+            with torch.no_grad():
+                action = self.actor_model(observation)
 
-        action = action.cpu().data.numpy()[0]
+        action = action.detach().cpu().data.numpy()[0]
         return action
 
+    def get_eval_action(self, observation):
+        observation = torch.from_numpy(observation).float().unsqueeze(0).to(self.device)
+        self.actor_model.eval()
+        with torch.no_grad():
+            action = self.actor_model(observation)
+        action = action.detach().cpu().data.numpy()[0]
+        return action
 
-    def train(self, done):
-        if (len(self.replay_memory) < self.minibatch_size):
-            return
+    def get_data_to_train(self):
         # Sample random minibatch of transitions from memory
         minibatch = random.sample(self.replay_memory, self.minibatch_size)
         observations = torch.from_numpy(np.vstack([e[0] for e in minibatch if e is not None])).float().to(self.device)
         actions = torch.from_numpy(np.vstack([e[1] for e in minibatch if e is not None])).float().to(self.device)
         rewards = torch.from_numpy(np.vstack([e[2] for e in minibatch if e is not None])).float().to(self.device)
-        next_observations = torch.from_numpy(np.vstack([e[3] for e in minibatch if e is not None])).float().to(self.device)
+        next_observations = torch.from_numpy(np.vstack([e[3] for e in minibatch if e is not None])).float().to(
+            self.device)
         dones = torch.from_numpy(np.vstack([e[4] for e in minibatch if e is not None]).astype(np.uint8)).float().to(
             self.device)
 
+        return observations, actions, rewards, next_observations, dones
+
+
+    def train(self, done):
+        if (len(self.replay_memory) < self.minibatch_size):
+            return
+
+        observations, actions, rewards, next_observations, dones = self.get_data_to_train()
+
         # Train critic network
         critic_qs = self.critic_model(observations, actions)
-        next_actions = self.actor_target_model(next_observations)
-        critic_target_model_next_qs = self.critic_target_model(next_observations, next_actions.detach())
-        critic_target = rewards + self.discount_rate * critic_target_model_next_qs*(1-dones)
+        with torch.no_grad():
+            next_actions = self.actor_target_model(next_observations)
+            critic_target_model_next_qs = self.critic_target_model(next_observations, next_actions.detach())
+            critic_target = rewards + self.discount_rate * critic_target_model_next_qs*(1-dones)
         #critic_loss = nn.MSELoss(critic_qs, critic_target).to(self.device)
         critic_loss = self.critic_loss(critic_qs, critic_target)
 

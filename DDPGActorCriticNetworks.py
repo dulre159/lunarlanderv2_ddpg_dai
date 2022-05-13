@@ -116,22 +116,3 @@ class ActorNetwork(nn.Module):
     def load_checkpoint(self):
         print('ActorNetwork: loading checkpoint...')
         self.load_state_dict(T.load(self.checkpoint_file))
-
-class NextStateRewardGeneratorModel(nn.Module):
-    def __init__(self, input_size, input_layer_output_size, fc_hidden_layer_one_input_size,
-                 fc_hidden_layer_one_output_size, output_layer_output_size, output_size):
-        super(ActorNetwork, self).__init__()
-        self.linear_relu_stack = nn.Sequential(
-            nn.Linear(input_size, input_layer_output_size),
-            nn.ReLU(),
-            nn.Linear(fc_hidden_layer_one_input_size, fc_hidden_layer_one_output_size),
-            nn.ReLU(),
-            nn.Linear(output_layer_output_size, output_size),
-            nn.Tanh()
-        )
-
-        #The TanH in the end is needed to keep the outputs between -/+1
-
-    def forward(self, x):
-        actions = self.linear_relu_stack(x)
-        return actions

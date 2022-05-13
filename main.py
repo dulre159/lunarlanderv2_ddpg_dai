@@ -143,7 +143,7 @@ def do_evaluation(ddpgAgent, n_eval_eps, env, rewards_dict, max_eval_ep_steps, t
       total_eval_ep_reward = 0
       eval_ep_steps = 0
       while not eval_done:
-          eval_action = ddpgAgent.get_action(eval_obs, rewards_dict)
+          eval_action = ddpgAgent.get_eval_action(eval_obs)
           eval_next_observation, eval_reward, eval_done, eval_info = env.step(eval_action)
           eval_obs = eval_next_observation
           total_eval_ep_reward += eval_reward
@@ -164,11 +164,11 @@ def do_evaluation(ddpgAgent, n_eval_eps, env, rewards_dict, max_eval_ep_steps, t
 
 if __name__ == '__main__':
 
-    signal.signal(signal.SIGINT, exit_gracefully)
-
-    input_thread = threading.Thread(target=get_user_input, args=(user_input,))
-    input_thread.daemon = True
-    input_thread.start()
+    # signal.signal(signal.SIGINT, exit_gracefully)
+    #
+    # input_thread = threading.Thread(target=get_user_input, args=(user_input,))
+    # input_thread.daemon = True
+    # input_thread.start()
 
     #exp_exp_strategy_name = "just_gnoise"
     #exp_exp_strategy_name = "gnoise_eps-decay"
@@ -259,7 +259,7 @@ if __name__ == '__main__':
         eps_dec=eps_dec
         )
     steps = 0
-    n_eps = 250 if not load_last_run_from_disk or last_run_information is None else last_run_information[1]
+    n_eps = 5 if not load_last_run_from_disk or last_run_information is None else last_run_information[1]
     ep = 0 if not load_last_run_from_disk or last_run_information is None else last_run_information[0]
     tot_ep_reward_history = [] if not load_last_run_from_disk or last_run_information is None else last_run_information[3]
     tot_eval_ep_avg_reward_history = [] if not load_last_run_from_disk or last_run_information is None else last_run_information[4]
@@ -286,11 +286,11 @@ if __name__ == '__main__':
 
 
         # In case user wants to stop the training
-        if user_input is not None and len(user_input) > 0 and user_input[0] is not None and len(user_input[0]) > 0 and (user_input[0][0]).lower() == 's':
-            save_everything(ddpgAgent, last_run_replay_memory_filename, last_run_filename, plot_filename, ep, n_eps,
-                            rewards_dict, tot_ep_reward_history, tot_eval_ep_avg_reward_history)
-            plot_running_mean_of_rewards_history(plot_filename, ep, tot_ep_reward_history)
-            break
+        # if user_input is not None and len(user_input) > 0 and user_input[0] is not None and len(user_input[0]) > 0 and (user_input[0][0]).lower() == 's':
+        #     save_everything(ddpgAgent, last_run_replay_memory_filename, last_run_filename, plot_filename, ep, n_eps,
+        #                     rewards_dict, tot_ep_reward_history, tot_eval_ep_avg_reward_history)
+        #     plot_running_mean_of_rewards_history(plot_filename, ep, tot_ep_reward_history)
+        #     break
 
         total_reward_per_ep = 0
         observation = env.reset()
@@ -301,21 +301,21 @@ if __name__ == '__main__':
             action = ddpgAgent.get_action(observation, rewards_dict)
             next_observation, reward, done, info = env.step(action)
             #rewards_dict["now"] = reward
+            # To speed up training max number of steps are 400
+            if ep_steps == max_ep_steps:
+                done = True
             ddpgAgent.save_state([observation, action, reward, next_observation, done])
             ddpgAgent.train(done)
             observation = next_observation
             total_reward_per_ep += reward
             #steps += 1
             ep_steps += 1
-            #To speed up training max number of steps are 400
-            if ep_steps == max_ep_steps:
-                done = True
             if done:
                 #print("Ep-N: {}, Ep-Steps: {}, Tot-Ep-R: {:.5f}, Avg-R-100-EP: {:.5f},Avg-R-10-EP: {:.5f}, Avg-R-{}-EP: {:.5f}, Max-R: {:.3f}, Var-R: {:.3f}, STD-R: {:.3f}, EPS:{:.5f}, EPS_VDBE_R_MT_LT:{:.5f}, EPS_VDBE_R_MT_LT_MTR:{:.2f}, EPS_VDBE_R_MT_LT_LTR:{:.2f}".format(ep, ep_steps, total_reward_per_ep,  rewards_dict["avg_100_ep"], rewards_dict["avg_10_ep"], ep, rewards_dict["avg_tot_ep"], rewards_dict["max"], rewards_dict["variance"], rewards_dict["std"], ddpgAgent.eps, ddpgAgent.eps_vdbe_mt_lt, rewards_dict["mt"], rewards_dict["lt"]))
                 print("Ep-N: {}, Ep-Steps: {}, Tot-Ep-R: {:.5f}, Avg-R-100-EP: {:.5f},Avg-R-10-EP: {:.5f}, Avg-R-{}-EP: {:.5f}, EPS:{:.5f}".format(ep, ep_steps, total_reward_per_ep,  rewards_dict["avg_100_ep"], rewards_dict["avg_10_ep"], ep, rewards_dict["avg_tot_ep"], ddpgAgent.eps))
                 print("Input [S or s] to STOP - [P or p] to PAUSE")
-            if ep % ep_render_step == 0:
-                env.render()
+            #if ep % ep_render_step == 0:
+                #env.render()
 
         # if ep == 0 and init_max_reward:
         #     rewards_dict["max"] = total_reward_per_ep
