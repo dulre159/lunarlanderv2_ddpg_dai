@@ -126,6 +126,7 @@ def print_final_plots():
                 confdir["avg_eval_ep_rewards_history"].append(data[4])
 
     # Compute avg eval reward over avg eval rewards history
+
     for confdir in confs:
             mean_arh = np.mean(confdir["avg_ep_rewards_history"], axis=0)
             mean_aerh = np.mean(confdir["avg_eval_ep_rewards_history"], axis=0)

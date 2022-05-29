@@ -68,8 +68,8 @@ if __name__ == '__main__':
     # apnAdaptationCoefficient = 1.01
     apnAdaptationCoefficient = 0.99
 
+    # Set strategy_params_folder name
     strategy_params=""
-    # Change filename depending on the selected strategy
     if exp_exp_strategy_name == "just_gnoise":
         strategy_params += "std" + str(gnoisestd).replace(".", "p")
     elif exp_exp_strategy_name == "gnoise_eps-decay":
@@ -99,6 +99,9 @@ if __name__ == '__main__':
         "apnAdaptationCoefficient" + str(apnAdaptationCoefficient).replace(".", "p")
     else:
         strategy_params = "noparams"
+
+    # Change filename depending on the selected strategy
+
     exp_exp_strategy_filename += "_" + strategy_params
 
     strategy_params_folder_path = exp_exp_strategy_name+"/"+strategy_params
