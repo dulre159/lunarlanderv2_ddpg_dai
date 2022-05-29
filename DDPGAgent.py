@@ -7,17 +7,20 @@ from torch import nn
 
 from DDPGActorCriticNetworks import ActorNetwork, CriticNetwork
 import os.path
+from DDPGUtils import OUNoise, AdaptiveParamNoiseSpec
 
 class DDPGAgent():
-    def __init__(self, env, actor_model_name, actor_target_model_name, critic_model_name, critic_target_model_name, replay_memory,
-                 exp_exp_strategy_name="", load_models_from_disk=False, minibatch_size=256, discount_rate=0.99, tau=1e-2,
+    def __init__(self, env, actor_model_path_filename, actor_target_model_path_filename, critic_model_path_filename, critic_target_model_path_filename, replay_memory,
+                 exp_exp_strategy_name="", load_models_from_disk=False, minibatch_size=64, discount_rate=0.99, tau=1e-2,
                  actor_learning_rate=1e-04, critic_learning_rate=1e-03, eps_init=1.0, eps_min=0.01, eps_dec=0.0009,
-                 memory_size=100000, gnoisestd = 0.1, eps_vdbe_mt_lt=1, eps_vdbe_mt_lt_mt_tau=2, eps_vdbe_mt_lt_lt_tau=2,
-                 eps_vdbe_mt_lt_boltz_tau=5):
+                 memory_size=100000, gnoisestd=0.1, ounMU=0.0, ounTheta=0.15, ounSigma=0.3, ounDT=1e-2, apnDesiredActionStddev=.2, apnInitialStddev=.1, apnAdaptationCoefficient=1.01, apnUpdateRate=50):
 
+        # Type of noise strategy
         self.exp_exp_strategy_name = exp_exp_strategy_name
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        # Environment related parameters
         self.observation_space = env.observation_space
         self.action_space = env.action_space
 
@@ -33,40 +36,70 @@ class DDPGAgent():
         self.as_high_tensor = torch.from_numpy(self.as_high).float().unsqueeze(0).to(self.device)
         self.as_low_tensor = torch.from_numpy(self.as_low).float().unsqueeze(0).to(self.device)
 
-        self.actor_model_name = actor_model_name
-        self.actor_target_model_name = actor_target_model_name
-        self.critic_model_name = critic_model_name
-        self.critic_target_model_name = critic_target_model_name
+        # Epsilon related noise parameters
         self.eps_dec = eps_dec
         self.eps = eps_init
-        self.discount_rate = discount_rate
-        self.actor_learning_rate = actor_learning_rate
-        self.critic_learning_rate = critic_learning_rate
         self.eps_min = eps_min
+
+        # Gaussian noise related params
+        self.gnoisestd = gnoisestd
+
+        # OUNoise
+        self.ounoise = OUNoise(self.as_shape, ounMU, ounTheta, ounSigma, ounDT)
+
+        # Adaptive parameter noise params
+        self.apnDistances = []
+        self.apnDesiredActionStddev = apnDesiredActionStddev
+        self.apnInitialStddev = apnInitialStddev
+        self.apnAdaptationCoefficient = apnAdaptationCoefficient
+        self.apnNoise = AdaptiveParamNoiseSpec(self.apnInitialStddev, self.apnDesiredActionStddev, self.apnAdaptationCoefficient)
+        self.apnUpdateRate = apnUpdateRate
+
+        # Replay memory parameters
         self.memory_size = memory_size
         self.replay_memory = deque(maxlen=self.memory_size) if replay_memory is None else replay_memory
         self.minibatch_size = minibatch_size
-        self.load_models_from_disk = load_models_from_disk
-        self.tau = tau
-        self.gnoisestd = gnoisestd
-        #self.gnoisestd = torch.abs(torch.max(self.as_high_tensor)).item()
-        #self.gnoisestd = torch.abs(torch.max(self.as_high_tensor)).item()/2
-        self.eps_vdbe_mt_lt = eps_vdbe_mt_lt
-        self.eps_vdbe_mt_lt_mt_tau = eps_vdbe_mt_lt_mt_tau
-        self.eps_vdbe_mt_lt_lt_tau = eps_vdbe_mt_lt_lt_tau
-        self.eps_vdbe_mt_lt_boltz_tau = eps_vdbe_mt_lt_boltz_tau
-        self.eps_vdbe_mt_lt_teta = 1 / self.as_shape[0]
 
+        self.load_models_from_disk = load_models_from_disk
+
+        # Use if we need to collect history of models loss
+        self.actor_loss_history = []
+        self.critic_loss_history = []
+        self.actor_target_loss_history = []
+        self.critic_target_loss_history = []
+
+        # Models related parameters
+        self.actor_model_path_filename = actor_model_path_filename
+        self.actor_target_model_path_filename = actor_target_model_path_filename
+        self.critic_model_path_filename = critic_model_path_filename
+        self.critic_target_model_path_filename = critic_target_model_path_filename
+        self.discount_rate = discount_rate
+        self.actor_learning_rate = actor_learning_rate
+        self.critic_learning_rate = critic_learning_rate
+        self.tau = tau
+        # Original params 400 300
+        self.actor_fc1_pnum = 200
+        self.actor_fc2_pnum = 150
+        self.critic_fc1_pnum = 200
+        self.critic_fc2_pnum = 150
         self.build_models()
 
     def build_models(self):
-        self.actor_model = ActorNetwork(self.actor_learning_rate, self.os_shape[0], 200, 150, self.as_shape[0], self.actor_model_name)
-        self.actor_target_model = ActorNetwork(self.actor_learning_rate, self.os_shape[0], 200, 150, self.as_shape[0], self.actor_target_model_name)
 
-        self.critic_model = CriticNetwork(self.critic_learning_rate, self.os_shape[0], 200, 150, self.as_shape[0], self.critic_model_name)
-        self.critic_target_model = CriticNetwork(self.critic_learning_rate, self.os_shape[0], 200, 150, self.as_shape[0], self.critic_target_model_name)
+        self.actor_model = ActorNetwork(self.actor_learning_rate, self.os_shape[0], self.actor_fc1_pnum, self.actor_fc2_pnum, self.as_shape[0], self.actor_model_path_filename, 'ActorNetwork')
+        self.actor_target_model = ActorNetwork(self.actor_learning_rate, self.os_shape[0], self.actor_fc1_pnum, self.actor_fc2_pnum, self.as_shape[0], self.actor_target_model_path_filename, 'TargetActorNetwork')
 
-        if self.load_models_from_disk and os.path.isfile(self.critic_model_name) and os.path.isfile(self.critic_target_model_name) and os.path.isfile(self.actor_model_name) and os.path.isfile(self.actor_target_model_name):
+        self.critic_model = CriticNetwork(self.critic_learning_rate, self.os_shape[0], self.critic_fc1_pnum, self.critic_fc2_pnum, self.as_shape[0], self.critic_model_path_filename, 'CriticNetwork')
+        self.critic_target_model = CriticNetwork(self.critic_learning_rate, self.os_shape[0], self.critic_fc1_pnum, self.critic_fc2_pnum, self.as_shape[0], self.critic_target_model_path_filename, 'TargetCriticNetwork')
+
+        # Noised Actor for Adaptive Parametric Noise
+        # This will never be saved
+        self.noisy_actor_model = ActorNetwork(self.actor_learning_rate, self.os_shape[0], self.actor_fc1_pnum, self.actor_fc2_pnum, self.as_shape[0], '', 'NoisyActorNetwork')
+        self.perturb_actor_parameters()
+        #self.noisy_actor_model.load_state_dict(self.actor_model.state_dict().copy())
+        #self.noisy_actor_model.add_parameter_noise(self.apnNoise.get_current_stddev())
+
+        if self.load_models_from_disk and os.path.isfile(self.critic_model_path_filename) and os.path.isfile(self.critic_target_model_path_filename) and os.path.isfile(self.actor_model_path_filename) and os.path.isfile(self.actor_target_model_path_filename):
             self.actor_model.load_checkpoint()
             self.actor_target_model.load_checkpoint()
             self.critic_model.load_checkpoint()
@@ -83,33 +116,11 @@ class DDPGAgent():
         observation, action, reward, next_observation, done = state
         self.replay_memory.append([observation, action, reward, next_observation, done])
 
-    # def get_mod_sigmoid_noise(self, avg_reward_over_N_episodes):
-    #     x = avg_reward_over_N_episodes
-    #     return 1/(1+0.5**(-x))
-    #
-    # def boltzman_diff(self, a, b, boltz_tau):
-    #     k_t_r_n = math.exp(a / boltz_tau) - math.exp(b / boltz_tau)
-    #     k_t_r_d = math.exp(a / boltz_tau) + math.exp(b / boltz_tau)
-    #     k_t_r = math.fabs(k_t_r_n / k_t_r_d)
-    #     return k_t_r
-    #
-    # def vdbe_epsilon(self, rewards_dict):
-    #     rewards_dict["mt"] = (rewards_dict["mt"]/self.eps_vdbe_mt_lt_mt_tau) + rewards_dict["now"]
-    #     rewards_dict["lt"] = (rewards_dict["lt"]/self.eps_vdbe_mt_lt_lt_tau) + rewards_dict["mt"]
-    #     #delta_r = math.fabs(rewards_dict["lt"] - rewards_dict["mt"])
-    #     k_t_r_n = math.exp(rewards_dict["mt"]/self.eps_vdbe_mt_lt_boltz_tau) - math.exp(rewards_dict["lt"]/self.eps_vdbe_mt_lt_boltz_tau)
-    #     k_t_r_d = math.exp(rewards_dict["mt"]/self.eps_vdbe_mt_lt_boltz_tau) + math.exp(rewards_dict["lt"]/self.eps_vdbe_mt_lt_boltz_tau)
-    #     k_t_r = math.fabs(k_t_r_n/k_t_r_d)
-    #     self.eps_vdbe_mt_lt = self.eps_vdbe_mt_lt_teta*k_t_r +(1-self.eps_vdbe_mt_lt_teta)*self.eps_vdbe_mt_lt
-    #
-    # def scale_between_two_values(self, x, rmin, rmax, tmin, tmax):
-    #     return ((x-rmin)/(rmax-rmin))*(tmax - tmin) + tmin
-
     def get_eps_greedy_action(self, observation):
         # Generate random number
         random_num = random.random()
         # Generate random action
-        random_action = torch.from_numpy(np.random.uniform(self.as_low,self.as_high, (1, self.as_shape[0])))
+        random_action = torch.from_numpy(np.random.uniform(self.as_low,self.as_high, (1, self.as_shape[0]))).to(self.device)
         # Get greedy action
         #greedy_action = self.actor_model(observation)
         self.actor_model.eval()
@@ -120,7 +131,8 @@ class DDPGAgent():
 
     def get_random_action(self, observation):
         # Generate random action
-        random_action = torch.from_numpy(np.random.uniform(self.as_low,self.as_high, (1, self.as_shape[0])))
+        random_action = torch.from_numpy(np.random.uniform(self.as_low,self.as_high, (1, self.as_shape[0]))).to(self.device)
+        random_action = torch.clip(random_action, self.as_low_tensor, self.as_high_tensor)
         return random_action
 
     def get_constant_noise_action(self, observation):
@@ -149,6 +161,49 @@ class DDPGAgent():
         noisy_action = torch.clip(noisy_action, self.as_low_tensor, self.as_high_tensor)
         return noisy_action
 
+    def get_constant_ounoise(self, observation):
+        #Get OUNoise
+        ounoise = self.ounoise.get_noise()
+        # Get greedy action
+        self.actor_model.eval()
+        with torch.no_grad():
+            greedy_action = self.actor_model(observation)
+            # Add noise
+            noisy_action = torch.from_numpy(ounoise).to(self.device) + greedy_action
+            # Clamp action
+            noisy_action = torch.clip(noisy_action, self.as_low_tensor, self.as_high_tensor)
+            return noisy_action
+
+    def ddpg_distance_metric(self, actions1, actions2):
+        """
+        Compute "distance" between actions taken by two policies at the same states
+        Expects numpy arrays
+        """
+        diff = actions1 - actions2
+        s = np.square(diff)
+        dist = math.sqrt(np.mean(s))
+        #mean_diff = np.mean(s, axis=0)
+        #dist = math.sqrt(np.mean(mean_diff))
+        return dist
+
+    def get_adaptive_parametric_noise(self, observation):
+        self.noisy_actor_model.eval()
+        #self.actor_model.eval()
+        with torch.no_grad():
+            # Get greedy action
+            #greedy_action = self.actor_model(observation)
+            # Hard copy the actor model params to noisy actor model
+            #self.noisy_actor_model.load_state_dict(self.actor_model.state_dict().copy())
+            # Add noise to the params of noisy actor model
+            #self.noisy_actor_model.add_parameter_noise(self.apnNoise.get_current_stddev())
+            # Get noisy action from noisy actor model
+            noisy_action = self.noisy_actor_model(observation)
+            # Clamp action
+            noisy_action = torch.clip(noisy_action, self.as_low_tensor, self.as_high_tensor)
+
+            return noisy_action
+
+
     def get_action(self, observation, rewards_dict):
         observation = torch.from_numpy(observation).float().unsqueeze(0).to(self.device)
         # Default strategy is greedy
@@ -165,7 +220,14 @@ class DDPGAgent():
             action = self.get_eps_greedy_action(observation)
         elif self.exp_exp_strategy_name == "random":
             action = self.get_random_action(observation)
+        elif self.exp_exp_strategy_name == "ounoise":
+            action = self.get_constant_ounoise(observation)
+        elif self.exp_exp_strategy_name == "adaptive-parameter-noise":
+            action = self.get_adaptive_parametric_noise(observation)
+        elif self.exp_exp_strategy_name == "no-noise":
+            action = self.get_greedy_action(observation)
         else:
+            # In any other case get greedy action
             self.actor_model.eval()
             with torch.no_grad():
                 action = self.actor_model(observation)
@@ -181,6 +243,12 @@ class DDPGAgent():
         action = action.detach().cpu().data.numpy()[0]
         return action
 
+    def get_greedy_action(self, observation):
+        self.actor_model.eval()
+        with torch.no_grad():
+            action = self.actor_model(observation)
+        return action
+
     def get_data_to_train(self):
         # Sample random minibatch of transitions from memory
         minibatch = random.sample(self.replay_memory, self.minibatch_size)
@@ -194,20 +262,69 @@ class DDPGAgent():
 
         return observations, actions, rewards, next_observations, dones
 
+    def hard_update(self, target, source):
+        for target_param, param in zip(target.parameters(), source.parameters()):
+            target_param.data.copy_(param.data)
 
-    def train(self, done):
+    def perturb_actor_parameters(self):
+        """Apply parameter noise to actor model, for exploration"""
+        self.hard_update(self.noisy_actor_model, self.actor_model)
+        params = self.noisy_actor_model.state_dict()
+        for name in params:
+            if 'ln' in name:
+                continue
+            param = params[name].to(self.device)
+            param += torch.randn(param.shape).to(self.device) * self.apnNoise.get_current_stddev()
+
+    def train(self, steps, done):
         if (len(self.replay_memory) < self.minibatch_size):
             return
 
         observations, actions, rewards, next_observations, dones = self.get_data_to_train()
 
-        # Train critic network
+        # Update Adaptive Parameters Noise params
+        if self.exp_exp_strategy_name == "adaptive-parameter-noise" and (steps%self.apnUpdateRate==0):
+            #self.noisy_actor_model.load_state_dict(self.actor_model.state_dict().copy())
+            #self.hard_update(self.noisy_actor_model, self.actor_model)
+            #self.noisy_actor_model.add_parameter_noise(self.apnNoise.get_current_stddev())
+            self.perturb_actor_parameters()
+            self.actor_model.eval()
+            self.noisy_actor_model.eval()
+            with torch.no_grad():
+                unperturbed_actions = self.actor_model(observations)
+                perturbed_actions = self.noisy_actor_model(observations)
+
+            ddpg_dist = self.ddpg_distance_metric(unperturbed_actions.detach().cpu().data.numpy(), perturbed_actions.detach().cpu().data.numpy())
+            self.apnNoise.adapt(ddpg_dist)
+
+        #Train without traget networks using CrossNorm from paper "CrossNorm: On Normalization for Off-Policy TD Reinforcement Learning"
+        # next_actions = self.actor_model(next_observations)
+        # obs_next_obs = torch.cat((observations, next_observations), 0)
+        # acts_next_acts = torch.cat((actions, next_actions.detach()), 0)
+        # xonoff = self.critic_model(obs_next_obs, acts_next_acts)
+
+        # with torch.no_grad():
+        #     self.critic_model.eval()
+        #     self.actor_model.eval()
+        #
+        #     xoff = self.critic_model(observations, actions)
+        #     xon = self.critic_model(next_observations, next_actions)
+        #     xcoff = xoff.mean().detach().cpu().data.item()
+        #     xcon = xon.mean().detach().cpu().data.item()
+        #     mucalfa = 0.5*xcoff + (1-0.5)*xcon
+        #     var = (math.pow(xcon-mucalfa,2)+math.pow(xcoff-mucalfa,2))/((self.minibatch_size*2)-1)
+        #
+        #     q_target = (xonoff - mucalfa)/(math.sqrt(var+0.00001))
+        #
+        # critic_loss = self.critic_loss(xonoff, q_target)
+
+        #Train critic network
+        self.critic_model.eval()
         critic_qs = self.critic_model(observations, actions)
         with torch.no_grad():
             next_actions = self.actor_target_model(next_observations)
             critic_target_model_next_qs = self.critic_target_model(next_observations, next_actions.detach())
             critic_target = rewards + self.discount_rate * critic_target_model_next_qs*(1-dones)
-        #critic_loss = nn.MSELoss(critic_qs, critic_target).to(self.device)
         critic_loss = self.critic_loss(critic_qs, critic_target)
 
         self.critic_model.train()
@@ -218,7 +335,7 @@ class DDPGAgent():
         # Train actor network
         self.critic_model.eval()
         self.actor_model.optimizer.zero_grad()
-        actor_loss = -self.critic_model.forward(observations, self.actor_model(observations)).mean()
+        actor_loss = -self.critic_model(observations, self.actor_model(observations)).mean()
         self.actor_model.train()
         actor_loss.backward()
         self.actor_model.optimizer.step()
