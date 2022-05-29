@@ -1,184 +1,34 @@
 import os.path
 import signal
 import sys
-import pickle
 import gym
 import numpy as np
-import torch
-
-from DDPGAgent import DDPGAgent
-from DDPGUtils import plot_learning_curve, plot_eval_curve
+from ddpg_agent import DDPGAgent
 import time
-import ast
+from main_utils import get_user_input, exit_gracefully, load_last_run_replay_memory
+from main_utils import load_last_run_info, plot_running_mean_of_rewards_history, plot_eval_mean_rewards_history
+from main_utils import save_everything, do_evaluation, search_if_dir_has_file_including_subdirs
 
 original_sigint = signal.getsignal(signal.SIGINT)
-
 user_input = [None]
-
-def get_user_input(user_input_ref):
-    user_input_ref[0] = input("Input [S or s] to STOP - [P or p] to PAUSE\n")
-
-def exit_gracefully(signum, frame):
-    # Restore the original signal handler as otherwise evil things will happen
-    # In raw_input when CTRL+C is pressed, and our signal handler is not re-entrant
-    signal.signal(signal.SIGINT, original_sigint)
-    sys.stdout.write('S\n')
-    user_input[0] = "s"
-    # Restore the exit gracefully handler here
-    signal.signal(signal.SIGINT, exit_gracefully)
-
-def save_last_run_replay_memory(last_run_replay_memory_filename, ddpgAgent):
-    print("Saving last run replay memory on file: " + last_run_replay_memory_filename + "...")
-    try:
-        last_run_replay_memory_file = open(last_run_replay_memory_filename, "wb")
-        last_run_replay_memory_file.truncate(0)
-        pickle.dump(ddpgAgent.replay_memory, last_run_replay_memory_file)
-        last_run_replay_memory_file.close()
-    except OSError:
-        print("OSError: Could not write last run replay memory file...")
-        return None
-    except Exception as err:
-        print("Unexpected error opening/writing to last run replay memory file: " + repr(err))
-        return None
-
-
-def load_last_run_replay_memory(last_run_replay_memory_filename):
-    print("Loading last run replay memory on file: " + last_run_replay_memory_filename + "...")
-    try:
-        last_run_replay_memory_file = open(last_run_replay_memory_filename, "rb")
-        replay_memory = pickle.load(last_run_replay_memory_file)
-        last_run_replay_memory_file.close()
-
-        return replay_memory
-
-    except OSError:
-        print("OSError: Could not write last run replay memory file...")
-        return None
-    except Exception as err:
-        print("Unexpected error opening/writing to last run replay memory file: " + repr(err))
-        return None
-
-
-def save_last_run_info(last_run_filename, ep, n_eps, rewards_dict, ddpgAgent, tot_ep_reward_history, tot_eval_ep_avg_reward_history):
-    print("Saving last run information on file: "+ last_run_filename +"...")
-    try:
-        last_run_file = open(last_run_filename, "w+")
-        last_run_file.truncate(0)
-        last_run_file.write(str(ep) + ";" + \
-                            str(n_eps) + ";" + \
-                            str(ddpgAgent.eps) + ";" + \
-                            str(tot_ep_reward_history) + ";" + \
-                            str(tot_eval_ep_avg_reward_history))
-        last_run_file.close()
-    except OSError:
-        print("OSError: Could not write last run information file...")
-        return None
-    except Exception as err:
-        print("Unexpected error opening/writing to last run information file: " + repr(err))
-        return None
-
-def load_last_run_info(last_run_filename):
-    print("Loading last run information file: "+last_run_filename+"...")
-    if not os.path.exists(last_run_filename) or not os.path.exists(last_run_replay_memory_filename):
-        print("Last run information file not found...")
-        return None
-
-    try:
-        last_run_file = open(last_run_filename, 'r')
-        file_content = last_run_file.read()
-        last_run_file.close()
-
-        if file_content.strip() == "" or file_content.count(";") != 4:
-            return None
-
-        data = file_content.split(";")
-
-        return int(data[0]), int(data[1]), float(data[2]), ast.literal_eval(data[3]), ast.literal_eval(data[4])
-
-    except OSError:
-        print("OSError: Could not read last run information file...")
-        return None
-    except Exception as err:
-        print("Unexpected error opening last run information file: " + repr(err))
-        return None
-
-def plot_running_mean_of_rewards_history(plot_filename, ep, tot_ep_reward_history):
-    timestr = time.strftime("%Y%m%d-%H%M%S")
-    pf = plot_filename + timestr + '.png'
-    print("Plotting running mean of rewards history on file: "+str(pf)+"...")
-    x = [i + 1 for i in range(ep)]
-    plot_learning_curve(x, tot_ep_reward_history, pf)
-def plot_eval_mean_rewards_history(eval_plot_filename, ep, tot_eval_ep_avg_reward_history, eval_ep):
-
-    timestr = time.strftime("%Y%m%d-%H%M%S")
-    pf = eval_plot_filename + timestr + '.png'
-    print("Plotting evaluation mean rewards history on file: "+str(pf)+"...")
-    plot_eval_curve(eval_ep, ep, tot_eval_ep_avg_reward_history, pf)
-
-def save_everything(ddpgAgent, last_run_replay_memory_filename, last_run_filename, plot_filename, ep, n_eps, rewards_dict, tot_ep_reward_history, tot_eval_ep_avg_reward_history):
-  print("--- Starting Saving Phase ---")
-  print("Saving models...")
-  ddpgAgent.save_models_checkpoints_to_disk()
-
-  save_last_run_replay_memory(last_run_replay_memory_filename, ddpgAgent)
-  save_last_run_info(last_run_filename, ep, n_eps, rewards_dict, ddpgAgent, tot_ep_reward_history, tot_eval_ep_avg_reward_history)
-  print("--- End Of Saving Phase ---")
-
-def do_evaluation(ddpgAgent, n_eval_eps, env, rewards_dict, max_eval_ep_steps, tot_eval_ep_avg_reward_history):
-  print("--- Starting Evaluation Phase ---")
-  tot_eval_eps_reward = 0
-  for eep in range(0, n_eval_eps):
-      eval_obs = env.reset()
-      eval_done = False
-      total_eval_ep_reward = 0
-      eval_ep_steps = 0
-      while not eval_done:
-          eval_action = ddpgAgent.get_eval_action(eval_obs)
-          eval_next_observation, eval_reward, eval_done, eval_info = env.step(eval_action)
-          eval_obs = eval_next_observation
-          total_eval_ep_reward += eval_reward
-          eval_ep_steps +=1
-
-          # To speed up evaluation max number of steps are 400
-          if eval_ep_steps == max_eval_ep_steps:
-              eval_done = True
-
-          if eval_done:
-              print("Eval-EP: {}, TOT-R: {}, STEPS: {}".format(eep, total_eval_ep_reward, eval_ep_steps))
-          #env.render()
-      tot_eval_eps_reward += total_eval_ep_reward
-  print("--- End Of Evaluation Phase ---")
-  tot_eval_ep_avg_reward_history.append((tot_eval_eps_reward/n_eval_eps))
-  print("Eval-EPS-AVG: {},".format((tot_eval_eps_reward/n_eval_eps)))
-
-
-def search_if_dir_has_file_including_subdirs(dir_path):
-    for x in os.scandir(dir_path):
-        if x.is_file(follow_symlinks=False):
-            return True
-        if x.is_dir(follow_symlinks=False):
-           if search_if_dir_has_file_including_subdirs(x.path) is True:
-               return True
-
-    return False
-
 
 if __name__ == '__main__':
 
-    # signal.signal(signal.SIGINT, exit_gracefully)
+    # signal.signal(signal.SIGINT, exit_gracefully, user_input, original_sigint)
     #
     # input_thread = threading.Thread(target=get_user_input, args=(user_input,))
     # input_thread.daemon = True
     # input_thread.start()
 
-    #exp_exp_strategy_name = "ounoise"
-    #exp_exp_strategy_name = "just_gnoise"
-    #exp_exp_strategy_name = "gnoise_eps-decay"
-    #exp_exp_strategy_name = "eps_greedy"
-    #exp_exp_strategy_name = "eps_greedy_eps-decay"
-    #exp_exp_strategy_name = "random"
+    # Choose exploration vs exploitation strategy
+    # exp_exp_strategy_name = "ounoise"
+    # exp_exp_strategy_name = "just_gnoise"
+    # exp_exp_strategy_name = "gnoise_eps-decay"
+    # exp_exp_strategy_name = "eps_greedy"
+    # exp_exp_strategy_name = "eps_greedy_eps-decay"
+    # exp_exp_strategy_name = "random"
     exp_exp_strategy_name = "adaptive-parameter-noise"
-    #exp_exp_strategy_name = "no-noise"
+    # exp_exp_strategy_name = "no-noise"
 
     exp_exp_strategy_filename = exp_exp_strategy_name
 
@@ -192,6 +42,9 @@ if __name__ == '__main__':
     load_models_from_disk = False
     load_last_run_from_disk = False
     load_last_run_replay_memory_from_disk = False
+
+    if load_run is True and load_models_from_disk is False and load_last_run_from_disk is False or load_last_run_replay_memory_from_disk is False:
+        sys.exit("Aborting... To load a run you must load at least its model or replay memory or last_run_info_file...")
 
     env_name = "LunarLanderContinuous-v2"
     # env_name = "BipedalWalker-v3"
@@ -212,7 +65,7 @@ if __name__ == '__main__':
 
     apnInitialStddev = 0.05
     apnDesiredActionStddev = 0.7
-    #apnAdaptationCoefficient = 1.01
+    # apnAdaptationCoefficient = 1.01
     apnAdaptationCoefficient = 0.99
 
     strategy_params=""
@@ -264,9 +117,7 @@ if __name__ == '__main__':
 
     if runs_folders is None or len(runs_folders)==0:
         if load_run:
-            print("There is no run to load data from for strategy: "+"["+exp_exp_strategy_name+"] with params: "+"["+strategy_params+"]....")
-            print("Aborting...")
-            exit(1)
+            sys.exit("Aborting... \nThere is no run to load data from for strategy: "+"["+exp_exp_strategy_name+"] with params: "+"["+strategy_params+"]....")
         else:
             # Create run0 folder for strategy params
             if not os.path.isdir(strategy_params_folder_path+"/run0"):
@@ -276,9 +127,7 @@ if __name__ == '__main__':
         if run_to_load_name in runs_folders:
             run_name = run_to_load_name
         else:
-            print("Could not load run \""+run_to_load_name+"\"...")
-            print("Aborting...")
-            exit(1)
+            sys.exit("Aborting...\nCould not load run \""+run_to_load_name+"\"...")
     else:
         runs_folders.sort()
         run_name = str(runs_folders[-1])
@@ -384,13 +233,13 @@ if __name__ == '__main__':
         if ep % save_ep == 0:
             save_everything(ddpgAgent, last_run_replay_memory_filename, last_run_filename, plot_filename, ep, n_eps,
                                 rewards_dict, tot_ep_reward_history, tot_eval_ep_avg_reward_history)
-            #plot_running_mean_of_rewards_history(plot_filename, ep, tot_ep_reward_history)
-            #plot_eval_mean_rewards_history(eval_plot_filename, ep, tot_eval_ep_avg_reward_history, eval_ep)
+            # plot_running_mean_of_rewards_history(plot_filename, ep, tot_ep_reward_history)
+            # plot_eval_mean_rewards_history(eval_plot_filename, ep, tot_eval_ep_avg_reward_history, eval_ep)
 
         # Evaluation step
         if ep % eval_ep == 0:
             do_evaluation(ddpgAgent, n_eval_eps, env, rewards_dict, max_eval_ep_steps, tot_eval_ep_avg_reward_history)
-            #plot_eval_mean_rewards_history(eval_plot_filename, ep, tot_eval_ep_avg_reward_history, eval_ep)
+            # plot_eval_mean_rewards_history(eval_plot_filename, ep, tot_eval_ep_avg_reward_history, eval_ep)
 
         # In case user wants to stop the training
         # if user_input is not None and len(user_input) > 0 and user_input[0] is not None and len(user_input[0]) > 0 and (user_input[0][0]).lower() == 's':
@@ -447,6 +296,7 @@ if __name__ == '__main__':
     print("TRAINING TOOK: " + time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
 
 
+# Old code for testing DQNAgent
 # if __name__ == '__main__':
 #     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 #     env_name = "CartPole-v1"

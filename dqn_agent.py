@@ -4,7 +4,7 @@ import numpy as np
 import gym
 import torch
 from torch import nn, optim
-from FCQNetwork import FCQNetwork as QNetwork
+from fcq_network import FCQNetwork as QNetwork
 import os.path
 
 class DeepQAgent():

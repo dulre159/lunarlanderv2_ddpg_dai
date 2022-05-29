@@ -4,6 +4,8 @@
 # Do the same for all others configurations
 import os
 import ast
+import sys
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -125,8 +127,9 @@ def print_final_plots():
     x_train = [i+1 for i in range(1000)]
     x_eval = [i for i in range(0, 1001, 100)]
     eval_x_err = [50 for i in range(0, 11)]
-    plot_filename_eval = "eval_final_results.png"
-    plot_filename_train = "train_final_results.png"
+    final_results_folder_name = "final_result_plots_output"
+    plot_filename_eval = final_results_folder_name + "/eval_final_results.png"
+    plot_filename_train = final_results_folder_name + "/train_final_results.png"
     figure_eval, axis_eval = plt.subplots(figsize=(12.8,9.6))
     # figure_eval, axis_eval = plt.subplots()
     # figure_train, axis_train = plt.subplots()
@@ -169,4 +172,4 @@ def print_final_plots():
 
 if __name__ == '__main__':
     print_final_plots()
-    exit()
+    sys.exit()

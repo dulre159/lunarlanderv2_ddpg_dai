@@ -5,9 +5,9 @@ import numpy as np
 import torch
 from torch import nn
 
-from DDPGActorCriticNetworks import ActorNetwork, CriticNetwork
+from ddpg_networks import ActorNetwork, CriticNetwork
 import os.path
-from DDPGUtils import OUNoise, AdaptiveParamNoiseSpec
+from ddpg_utils import OUNoise, AdaptiveParamNoiseSpec
 
 class DDPGAgent():
     def __init__(self, env, actor_model_path_filename, actor_target_model_path_filename, critic_model_path_filename, critic_target_model_path_filename, replay_memory,
