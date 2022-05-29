@@ -62,6 +62,19 @@ confs = [
         "avg_eval_ep_rewards_history_means": []
     },
     {
+        "name": "Adaptive Parametric Noise",
+        "strategy_name": "adaptive-parameter-noise",
+        "plot_color": "black",
+        "plot_symbol": "2",
+        "params_folder_name": "apnInitialStddev0p05_apnDesiredActionStddev0p7_apnAdaptationCoefficient0p99",
+        "avg_ep_rewards_history": [],
+        "avg_eval_ep_rewards_history": [],
+        "avg_ep_rewards_history_stds": [],
+        "avg_ep_rewards_history_means": [],
+        "avg_eval_ep_rewards_history_stds": [],
+        "avg_eval_ep_rewards_history_means": []
+    },
+    {
         "name": "No Noise",
         "strategy_name":"no-noise",
         "plot_color":"red",
@@ -105,7 +118,7 @@ def print_final_plots():
     # Read last run files
     for i in range(0, 5):
         for confdir in confs:
-            #last_ep, tot_ep, eps, avg_ep_rewards_history, avg_eval_ep_rewards_history = load_last_run_info()
+            # last_ep, tot_ep, eps, avg_ep_rewards_history, avg_eval_ep_rewards_history = load_last_run_info()
             last_run_info_file_path = confdir["strategy_name"]+"/"+confdir["params_folder_name"]+"/"+"run"+str(i)+"/last_runs/"+env_name+"_"+confdir["strategy_name"]+"_"+confdir["params_folder_name"]+"_last_run.txt"
             data = load_last_run_info(last_run_info_file_path)
             if data is not None:
@@ -128,15 +141,20 @@ def print_final_plots():
     x_eval = [i for i in range(0, 1001, 100)]
     eval_x_err = [50 for i in range(0, 11)]
     final_results_folder_name = "final_result_plots_output"
+    # Make output folder if not there
+    if not os.path.isdir(final_results_folder_name):
+        os.mkdir(final_results_folder_name)
+
     plot_filename_eval = final_results_folder_name + "/eval_final_results.png"
     plot_filename_train = final_results_folder_name + "/train_final_results.png"
     figure_eval, axis_eval = plt.subplots(figsize=(12.8,9.6))
     # figure_eval, axis_eval = plt.subplots()
-    # figure_train, axis_train = plt.subplots()
+    figure_train, axis_train = plt.subplots(figsize=(12.8,9.6))
     # axis_eval.set_xlabel('Episodes', fontsize=20)
     axis_eval.set_xlabel('Episodes')
+    axis_train.set_xlabel('Episodes')
     # axis_eval.set_ylabel('Means eval rewards over all configurations', fontsize=20)
-    axis_eval.set_ylabel('Means eval rewards over all configurations')
+    axis_train.set_ylabel('Means rewards over all configurations')
     for confdir in confs:
         # axis_eval.plot(x_eval,
         #                confdir["avg_eval_ep_rewards_history_means"],
@@ -144,6 +162,12 @@ def print_final_plots():
         #                marker=confdir["plot_symbol"],
         #                linestyle='-',
         #                label=confdir["name"])
+        axis_train.plot(x_train,
+                       confdir["avg_ep_rewards_history_means"],
+                       color=confdir["plot_color"],
+                       marker=confdir["plot_symbol"],
+                       linestyle='-',
+                       label=confdir["name"])
         # axis_eval.fill_between(x_eval,
         #                        confdir["avg_eval_ep_rewards_history_stds"]*-1,
         #                        confdir["avg_eval_ep_rewards_history_stds"],
@@ -166,9 +190,13 @@ def print_final_plots():
                            label=confdir["name"])
     # axis_eval.legend(bbox_to_anchor=(1,1), fontsize=20)
     axis_eval.legend(bbox_to_anchor=(1,1))
+    axis_train.legend(bbox_to_anchor=(1,1))
     figure_eval.tight_layout()
+    figure_train.tight_layout()
     figure_eval.savefig(plot_filename_eval)
+    figure_train.savefig(plot_filename_train)
     plt.close(figure_eval)
+    plt.close(figure_train)
 
 if __name__ == '__main__':
     print_final_plots()

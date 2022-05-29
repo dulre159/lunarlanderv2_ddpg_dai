@@ -43,11 +43,11 @@ if __name__ == '__main__':
     load_last_run_from_disk = False
     load_last_run_replay_memory_from_disk = False
 
-    if load_run is True and load_models_from_disk is False and load_last_run_from_disk is False or load_last_run_replay_memory_from_disk is False:
+    if load_run is True and load_models_from_disk is False and load_last_run_from_disk is False and load_last_run_replay_memory_from_disk is False:
         sys.exit("Aborting... To load a run you must load at least its model or replay memory or last_run_info_file...")
 
-    env_name = "LunarLanderContinuous-v2"
-    # env_name = "BipedalWalker-v3"
+    # env_name = "LunarLanderContinuous-v2"
+    env_name = "BipedalWalker-v3"
     env = gym.make(env_name)
 
     rewards_dict ={"avg_10_ep": 0, "avg_50_ep": 0, "avg_100_ep": 0, "avg_tot_ep":0, "now": 0, "max": 0, "variance" : 0, "std" : 0}
@@ -206,7 +206,7 @@ if __name__ == '__main__':
         )
 
     steps = 0
-    n_eps = 1000 if not load_last_run_from_disk or last_run_information is None else last_run_information[1]
+    n_eps = 500 if not load_last_run_from_disk or last_run_information is None else last_run_information[1]
     ep = 0 if not load_last_run_from_disk or last_run_information is None else last_run_information[0]
     tot_ep_reward_history = [] if not load_last_run_from_disk or last_run_information is None else last_run_information[3]
     tot_eval_ep_avg_reward_history = [] if not load_last_run_from_disk or last_run_information is None else last_run_information[4]
@@ -215,8 +215,10 @@ if __name__ == '__main__':
     eval_ep = 100
     n_eval_eps = 50
     # To speed up training max number of steps per episode are 300
-    max_ep_steps = 300
-    max_eval_ep_steps = 300
+    # max_ep_steps = 300
+    max_ep_steps = -1
+    # max_eval_ep_steps = 300
+    max_eval_ep_steps = -1
     ep_render_step = 100
 
     start_time = time.time()
@@ -231,8 +233,7 @@ if __name__ == '__main__':
 
         # Save step
         if ep % save_ep == 0:
-            save_everything(ddpgAgent, last_run_replay_memory_filename, last_run_filename, plot_filename, ep, n_eps,
-                                rewards_dict, tot_ep_reward_history, tot_eval_ep_avg_reward_history)
+            save_everything(ddpgAgent, last_run_replay_memory_filename, last_run_filename, ep, n_eps, rewards_dict, tot_ep_reward_history, tot_eval_ep_avg_reward_history)
             # plot_running_mean_of_rewards_history(plot_filename, ep, tot_ep_reward_history)
             # plot_eval_mean_rewards_history(eval_plot_filename, ep, tot_eval_ep_avg_reward_history, eval_ep)
 
@@ -286,8 +287,7 @@ if __name__ == '__main__':
         #     rewards_dict["std"] = math.sqrt(rewards_dict["variance"])
 
     do_evaluation(ddpgAgent, n_eval_eps, env, rewards_dict, max_eval_ep_steps, tot_eval_ep_avg_reward_history)
-    save_everything(ddpgAgent, last_run_replay_memory_filename, last_run_filename, plot_filename, ep, n_eps,
-                    rewards_dict, tot_ep_reward_history, tot_eval_ep_avg_reward_history)
+    save_everything(ddpgAgent, last_run_replay_memory_filename, last_run_filename, ep, n_eps, rewards_dict, tot_ep_reward_history, tot_eval_ep_avg_reward_history)
     plot_running_mean_of_rewards_history(plot_filename, ep, tot_ep_reward_history)
     plot_eval_mean_rewards_history(eval_plot_filename, ep, tot_eval_ep_avg_reward_history, eval_ep)
 
