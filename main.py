@@ -5,6 +5,7 @@ import gym
 import numpy as np
 from ddpg_agent import DDPGAgent
 import time
+from datetime import timedelta
 from main_utils import get_user_input, exit_gracefully, load_last_run_replay_memory
 from main_utils import load_last_run_info, plot_running_mean_of_rewards_history, plot_eval_mean_rewards_history
 from main_utils import save_everything, do_evaluation, search_if_dir_has_file_including_subdirs
@@ -22,13 +23,15 @@ if __name__ == '__main__':
 
     # Choose exploration vs exploitation strategy
     # exp_exp_strategy_name = "ounoise"
-    # exp_exp_strategy_name = "just_gnoise"
+    exp_exp_strategy_name = "just_gnoise"
     # exp_exp_strategy_name = "gnoise_eps-decay"
     # exp_exp_strategy_name = "eps_greedy"
     # exp_exp_strategy_name = "eps_greedy_eps-decay"
     # exp_exp_strategy_name = "random"
-    exp_exp_strategy_name = "adaptive-parameter-noise"
+    # exp_exp_strategy_name = "adaptive-parameter-noise"
     # exp_exp_strategy_name = "no-noise"
+    # exp_exp_strategy_name = "no-noise-without-layer-normalization"
+    # exp_exp_strategy_name = "no-noise-with-layer-normalization-without-target-networks"
 
     exp_exp_strategy_filename = exp_exp_strategy_name
 
@@ -36,12 +39,12 @@ if __name__ == '__main__':
     if not os.path.isdir(exp_exp_strategy_name):
         os.mkdir(exp_exp_strategy_name)
 
-    load_run = False
+    load_run = True
     # Can be last_run or runX
-    run_to_load_name="last_run"
-    load_models_from_disk = False
-    load_last_run_from_disk = False
-    load_last_run_replay_memory_from_disk = False
+    run_to_load_name="run5"
+    load_models_from_disk = True
+    load_last_run_from_disk = True
+    load_last_run_replay_memory_from_disk = True
 
     if load_run is True and load_models_from_disk is False and load_last_run_from_disk is False and load_last_run_replay_memory_from_disk is False:
         sys.exit("Aborting... To load a run you must load at least its model or replay memory or last_run_info_file...")
@@ -118,14 +121,14 @@ if __name__ == '__main__':
         runs_folders = dirnames
         break
 
-    if runs_folders is None or len(runs_folders)==0:
-        if load_run:
-            sys.exit("Aborting... \nThere is no run to load data from for strategy: "+"["+exp_exp_strategy_name+"] with params: "+"["+strategy_params+"]....")
-        else:
-            # Create run0 folder for strategy params
-            if not os.path.isdir(strategy_params_folder_path+"/run0"):
-                os.mkdir(strategy_params_folder_path+"/run0")
-                run_name = "run0"
+    if runs_folders is None or len(runs_folders)==0 and not load_run:
+        # if load_run:
+        #     sys.exit("Aborting... \nThere is no run to load data from for strategy: "+"["+exp_exp_strategy_name+"] with params: "+"["+strategy_params+"]....")
+        # else:
+        # Create run0 folder for strategy params
+        if not os.path.isdir(strategy_params_folder_path+"/run0"):
+            os.mkdir(strategy_params_folder_path+"/run0")
+            run_name = "run0"
     elif load_run and run_to_load_name != "last_run" and run_to_load_name != "":
         if run_to_load_name in runs_folders:
             run_name = run_to_load_name
@@ -209,7 +212,7 @@ if __name__ == '__main__':
         )
 
     steps = 0
-    n_eps = 500 if not load_last_run_from_disk or last_run_information is None else last_run_information[1]
+    n_eps = 2000 if not load_last_run_from_disk or last_run_information is None else last_run_information[1]
     ep = 0 if not load_last_run_from_disk or last_run_information is None else last_run_information[0]
     tot_ep_reward_history = [] if not load_last_run_from_disk or last_run_information is None else last_run_information[3]
     tot_eval_ep_avg_reward_history = [] if not load_last_run_from_disk or last_run_information is None else last_run_information[4]
@@ -218,9 +221,9 @@ if __name__ == '__main__':
     eval_ep = 100
     n_eval_eps = 50
     # To speed up training max number of steps per episode are 300
-    # max_ep_steps = 300
+    # max_ep_steps = 500
     max_ep_steps = -1
-    # max_eval_ep_steps = 300
+    # max_eval_ep_steps = 500
     max_eval_ep_steps = -1
     ep_render_step = 100
 
@@ -258,8 +261,9 @@ if __name__ == '__main__':
         ep_steps = 0
 
         # Reset OUNoise every episode. Reason unknown...
-        ddpgAgent.ounoise.reset()
-
+        if exp_exp_strategy_name == "ounoise":
+            ddpgAgent.ounoise.reset()
+        # ep_start_time = time.time()
         while not done:
             action = ddpgAgent.get_action(observation, rewards_dict)
             next_observation, reward, done, info = env.step(action)
@@ -277,7 +281,8 @@ if __name__ == '__main__':
                 print("Input [S or s] to STOP - [P or p] to PAUSE")
             # if ep % ep_render_step == 0:
                 # env.render()
-
+        # ep_elapsed_time = time.time() - ep_start_time
+        # print("EP TOOK: " + str(timedelta(seconds=ep_elapsed_time)))
         tot_ep_reward_history.append(total_reward_per_ep)
 
         rewards_dict["avg_10_ep"] = np.mean(tot_ep_reward_history[-10:])

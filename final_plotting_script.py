@@ -88,6 +88,19 @@ confs = [
         "avg_eval_ep_rewards_history_means":[]
     },
     {
+        "name": "No Noise W/T LN",
+        "strategy_name": "no-noise-without-layer-normalization",
+        "plot_color": "#808000",
+        "plot_symbol": "3",
+        "params_folder_name": "noparams",
+        "avg_ep_rewards_history": [],
+        "avg_eval_ep_rewards_history": [],
+        "avg_ep_rewards_history_stds": [],
+        "avg_ep_rewards_history_means": [],
+        "avg_eval_ep_rewards_history_stds": [],
+        "avg_eval_ep_rewards_history_means": []
+    },
+    {
         "name": "Random",
         "strategy_name":"random",
         "plot_color": "blue",
@@ -136,6 +149,7 @@ def print_final_plots():
             confdir["avg_ep_rewards_history_stds"] = std_arh
             confdir["avg_eval_ep_rewards_history_means"] = mean_aerh
             confdir["avg_eval_ep_rewards_history_stds"] = std_aerh
+            print("Strategy: {}, Eval-History-STDs: {},".format(confdir['name'], std_aerh))
 
     # Plot on one figure
     x_train = [i+1 for i in range(1000)]
@@ -147,22 +161,26 @@ def print_final_plots():
         os.mkdir(final_results_folder_name)
 
     plot_filename_eval = final_results_folder_name + "/eval_final_results.png"
+    plot_filename_eval_with_std = final_results_folder_name + "/eval_with_std_final_results.png"
     plot_filename_train = final_results_folder_name + "/train_final_results.png"
     figure_eval, axis_eval = plt.subplots(figsize=(12.8,9.6))
+    figure_eval_with_std, axis_eval_with_std = plt.subplots(figsize=(12.8,9.6))
     # figure_eval, axis_eval = plt.subplots()
     figure_train, axis_train = plt.subplots(figsize=(12.8,9.6))
     # axis_eval.set_xlabel('Episodes', fontsize=20)
     axis_eval.set_xlabel('Episodes')
+    axis_eval_with_std.set_xlabel('Episodes')
     axis_train.set_xlabel('Episodes')
-    # axis_eval.set_ylabel('Means eval rewards over all configurations', fontsize=20)
+    axis_eval.set_ylabel('Means eval rewards over all configurations')
+    axis_eval_with_std.set_ylabel('Means eval rewards over all configurations')
     axis_train.set_ylabel('Means rewards over all configurations')
     for confdir in confs:
-        # axis_eval.plot(x_eval,
-        #                confdir["avg_eval_ep_rewards_history_means"],
-        #                color=confdir["plot_color"],
-        #                marker=confdir["plot_symbol"],
-        #                linestyle='-',
-        #                label=confdir["name"])
+        axis_eval.plot(x_eval,
+                       confdir["avg_eval_ep_rewards_history_means"],
+                       color=confdir["plot_color"],
+                       marker=confdir["plot_symbol"],
+                       linestyle='-',
+                       label=confdir["name"])
         axis_train.plot(x_train,
                        confdir["avg_ep_rewards_history_means"],
                        color=confdir["plot_color"],
@@ -178,7 +196,7 @@ def print_final_plots():
         #                        linewidth=1,
         #                        linestyle='dashdot',
         #                        antialiased=True)
-        axis_eval.errorbar(x_eval,
+        axis_eval_with_std.errorbar(x_eval,
                            confdir["avg_eval_ep_rewards_history_means"],
                            yerr=confdir["avg_eval_ep_rewards_history_stds"],
                            #xerr=eval_x_err,
@@ -191,12 +209,16 @@ def print_final_plots():
                            label=confdir["name"])
     # axis_eval.legend(bbox_to_anchor=(1,1), fontsize=20)
     axis_eval.legend(bbox_to_anchor=(1,1))
+    axis_eval_with_std.legend(bbox_to_anchor=(1,1))
     axis_train.legend(bbox_to_anchor=(1,1))
     figure_eval.tight_layout()
+    figure_eval_with_std.tight_layout()
     figure_train.tight_layout()
     figure_eval.savefig(plot_filename_eval)
+    figure_eval_with_std.savefig(plot_filename_eval_with_std)
     figure_train.savefig(plot_filename_train)
     plt.close(figure_eval)
+    plt.close(figure_eval_with_std)
     plt.close(figure_train)
 
 if __name__ == '__main__':

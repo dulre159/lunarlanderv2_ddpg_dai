@@ -78,10 +78,16 @@ class DDPGAgent():
         self.critic_learning_rate = critic_learning_rate
         self.tau = tau
         # Original params 400 300
-        self.actor_fc1_pnum = 200
-        self.actor_fc2_pnum = 150
-        self.critic_fc1_pnum = 200
-        self.critic_fc2_pnum = 150
+        # self.actor_fc1_pnum = 200
+        # self.actor_fc2_pnum = 150
+        # self.critic_fc1_pnum = 200
+        # self.critic_fc2_pnum = 150
+
+        self.actor_fc1_pnum = 400
+        self.actor_fc2_pnum = 300
+        self.critic_fc1_pnum = 400
+        self.critic_fc2_pnum = 300
+
         self.build_models()
 
     def build_models(self):
@@ -226,6 +232,8 @@ class DDPGAgent():
             action = self.get_adaptive_parametric_noise(observation)
         elif self.exp_exp_strategy_name == "no-noise":
             action = self.get_greedy_action(observation)
+        elif self.exp_exp_strategy_name == "no-noise-without-layer-normalization":
+            action = self.get_greedy_action(observation)
         else:
             # In any other case get greedy action
             self.actor_model.eval()
@@ -322,12 +330,17 @@ class DDPGAgent():
         self.critic_model.eval()
         critic_qs = self.critic_model(observations, actions)
         with torch.no_grad():
-            next_actions = self.actor_target_model(next_observations)
-            critic_target_model_next_qs = self.critic_target_model(next_observations, next_actions.detach())
-            critic_target = rewards + self.discount_rate * critic_target_model_next_qs*(1-dones)
-        critic_loss = self.critic_loss(critic_qs, critic_target)
+            if "without-target-networks" in self.exp_exp_strategy_name:
+                next_actions = self.actor_model(next_observations)
+                critic_model_next_qs = self.critic_model(next_observations, next_actions.detach())
+                critic_target = rewards + self.discount_rate * critic_model_next_qs * (1 - dones)
+            else:
+                next_actions = self.actor_target_model(next_observations)
+                critic_target_model_next_qs = self.critic_target_model(next_observations, next_actions.detach())
+                critic_target = rewards + self.discount_rate * critic_target_model_next_qs*(1-dones)
 
         self.critic_model.train()
+        critic_loss = self.critic_loss(critic_qs, critic_target)
         self.critic_model.optimizer.zero_grad()
         critic_loss.backward()
         self.critic_model.optimizer.step()
@@ -341,7 +354,8 @@ class DDPGAgent():
         self.actor_model.optimizer.step()
 
         # Update target models parameters
-        self.update_targets_params()
+        if "without-target-networks" not in self.exp_exp_strategy_name:
+            self.update_targets_params()
 
         # Decrement epsilon
         if self.eps > self.eps_min and done is True and "eps-decay" in self.exp_exp_strategy_name:
