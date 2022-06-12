@@ -210,7 +210,7 @@ class DDPGAgent():
             return noisy_action
 
 
-    def get_action(self, observation, rewards_dict):
+    def get_action(self, observation, rewards_dict=[]):
         observation = torch.from_numpy(observation).float().unsqueeze(0).to(self.device)
         # Default strategy is greedy
         #action = self.actor_model(observation)
@@ -240,6 +240,12 @@ class DDPGAgent():
             with torch.no_grad():
                 action = self.actor_model(observation)
 
+        action = action.detach().cpu().data.numpy()[0]
+        return action
+
+    def get_eval_mod_action(self, observation):
+        observation = torch.from_numpy(observation).float().unsqueeze(0).to(self.device)
+        action = self.get_greedy_action(observation)
         action = action.detach().cpu().data.numpy()[0]
         return action
 
