@@ -1,4 +1,4 @@
-This repo contains my implementation of DQN and DDPG RL alghorithms.
+This repo contains my implementation of DQN and DDPG RL algorithms.
 
 The purpose of this code is limited to the project for my exam of DAI (Distributed Artificial Intelligence).
 
