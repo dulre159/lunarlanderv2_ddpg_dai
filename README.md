@@ -9,6 +9,11 @@ This code was written for a university exam and the scope was to test some explo
 <a href="https://www.tensorflow.org/agents/tutorials/0_intro_rl?hl=en">Introduction to RL and Deep Q Networks</a></br>
 <a href="https://spinningup.openai.com/en/latest/algorithms/ddpg.html">Deep Deterministic Policy Gradient</a></br>
 
+<h2>Requirements</h2>
+<a href="https://pypi.org/project/numpy/">numpy</a></br>
+<a href="https://pytorch.org/">pytorch</a></br>
+<a href="https://github.com/openai/gym">gym</a></br>
+
 <h2>USAGE</h2>
 The code is set to work with the OpenAIGym's LunarLanderV2 environment.</br>
 In the main.py file you can set the strategy to use, the number of training episodes and tune other params.</br>
