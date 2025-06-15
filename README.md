@@ -1,3 +1,7 @@
+<p align="center">
+<img src="https://github.com/dulre159/LunarLanderV2-DDPG-DAI/blob/master/lunarlanderv2gif.gif" alt="LunarLanderv2 environment">
+</p>
+
 <h1>Strategies for solving OpenAIGym's LunarLanderV2 with Deep Deterministic Policy Gradient</h1>
 This repo contains my implementation of <link> Deep Q Learning (DQN) and Deep Deterministic Policy Gradient (DDPG) Reinforcement learning (RL) algorithms for solving the <a href="https://www.gymlibrary.dev/environments/box2d/lunar_lander/">LunarLanderV2</a> problem.</br>
 This code was written for a university exam and the scope was to test some exploration vs exploitation strategies for DDPG agents.
