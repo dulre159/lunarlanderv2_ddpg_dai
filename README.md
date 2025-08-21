@@ -3,10 +3,10 @@
 </p>
 
 <h1>Strategies for solving OpenAIGym's LunarLanderV2 with Deep Deterministic Policy Gradient</h1>
-This repo contains my implementation of <link> Deep Q Learning (DQN) and Deep Deterministic Policy Gradient (DDPG) Reinforcement learning (RL) algorithms for solving the <a href="https://www.gymlibrary.dev/environments/box2d/lunar_lander/">LunarLanderV2</a> problem.</br>
-This code was written for a university exam and the scope was to test some exploration vs exploitation strategies for DDPG agents.
+This repo contains my implementation of <link> Deep Q Learning (DQN) and Deep Deterministic Policy Gradient (DDPG) Reinforcement Learning (RL) algorithms for solving the <a href="https://www.gymlibrary.dev/environments/box2d/lunar_lander/">LunarLanderV2</a> problem.</br>
+This code was written for a university exam, and the scope was to test some exploration vs exploitation strategies for DDPG agents.
 
-<h2>You can read more about RL, DQN and DDPG here</h2>
+<h2>You can read more about RL, DQN, and DDPG here</h2>
 <a href="https://spinningup.openai.com/en/latest/spinningup/rl_intro.html">Part 1: Key Concepts in RL</a></br>
 <a href="https://spinningup.openai.com/en/latest/spinningup/rl_intro2.html">Part 2: Kinds of RL Algorithms</a></br>
 <a href="https://spinningup.openai.com/en/latest/spinningup/rl_intro3.html">Part 3: Intro to Policy Optimization</a></br>
@@ -21,11 +21,11 @@ This code was written for a university exam and the scope was to test some explo
 <h2>USAGE</h2>
 The code is set to work with the OpenAIGym's LunarLanderV2 environment.</br>
 In the main.py file you can set the strategy to use, the number of training episodes and tune other params.</br>
-The total number of steps per episode are limited to 300 to speed up the training.</br>
+The total number of steps per episode is limited to 300 to speed up the training.</br>
 
 <h2>Details</h2>
 A Multilayer Perceptron (MLP) is used as a function approximator</br>
-The actor and critic networks are implemented as described in the original DDPG's paper. (citations are blow)</br>
+The actor and critic networks are implemented as described in the original DDPG paper. (citations are below)</br>
 Layer Normalization is used instead of BatchNorm after each ReLU activation layer.</br>
 
 </br>
