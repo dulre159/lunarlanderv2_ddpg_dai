@@ -31,6 +31,7 @@ Layer Normalization is used instead of BatchNorm after each ReLU activation laye
 </br>
 </br>
 
+```
 @misc{lillicrap2019continuouscontroldeepreinforcement,</br>
       title={Continuous control with deep reinforcement learning},</br>
       author={Timothy P. Lillicrap and Jonathan J. Hunt and Alexander Pritzel and Nicolas Heess and Tom Erez and Yuval Tassa and David Silver and Daan Wierstra},</br>
@@ -39,9 +40,7 @@ Layer Normalization is used instead of BatchNorm after each ReLU activation laye
       archivePrefix={arXiv},</br>
       primaryClass={cs.LG},</br>
       url={https://arxiv.org/abs/1509.02971},</br>
-}</br>
-
-</br>
+}
 
 @misc{mnih2013playingatarideepreinforcement,</br>
       title={Playing Atari with Deep Reinforcement Learning},</br> 
@@ -51,9 +50,7 @@ Layer Normalization is used instead of BatchNorm after each ReLU activation laye
       archivePrefix={arXiv},</br>
       primaryClass={cs.LG},</br>
       url={https://arxiv.org/abs/1312.5602},</br> 
-}</br>
-
-</br>
+}
 
 @misc{ba2016layernormalization,</br>
       title={Layer Normalization}, </br>
@@ -63,4 +60,6 @@ Layer Normalization is used instead of BatchNorm after each ReLU activation laye
       archivePrefix={arXiv},</br>
       primaryClass={stat.ML},</br>
       url={https://arxiv.org/abs/1607.06450}, </br>
-}</br>
+}
+
+```
