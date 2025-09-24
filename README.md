@@ -32,34 +32,34 @@ Layer Normalization is used instead of BatchNorm after each ReLU activation laye
 </br>
 
 ```
-@misc{lillicrap2019continuouscontroldeepreinforcement,</br>
-      title={Continuous control with deep reinforcement learning},</br>
-      author={Timothy P. Lillicrap and Jonathan J. Hunt and Alexander Pritzel and Nicolas Heess and Tom Erez and Yuval Tassa and David Silver and Daan Wierstra},</br>
-      year={2019},</br>
-      eprint={1509.02971},</br>
-      archivePrefix={arXiv},</br>
-      primaryClass={cs.LG},</br>
-      url={https://arxiv.org/abs/1509.02971},</br>
+@misc{lillicrap2019continuouscontroldeepreinforcement,
+      title={Continuous control with deep reinforcement learning},
+      author={Timothy P. Lillicrap and Jonathan J. Hunt and Alexander Pritzel and Nicolas Heess and Tom Erez and Yuval Tassa and David Silver and Daan Wierstra},
+      year={2019},
+      eprint={1509.02971},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/1509.02971},
 }
 
-@misc{mnih2013playingatarideepreinforcement,</br>
-      title={Playing Atari with Deep Reinforcement Learning},</br> 
-      author={Volodymyr Mnih and Koray Kavukcuoglu and David Silver and Alex Graves and Ioannis Antonoglou and Daan Wierstra and Martin Riedmiller},</br>
-      year={2013},</br>
-      eprint={1312.5602},</br>
-      archivePrefix={arXiv},</br>
-      primaryClass={cs.LG},</br>
-      url={https://arxiv.org/abs/1312.5602},</br> 
+@misc{mnih2013playingatarideepreinforcement,
+      title={Playing Atari with Deep Reinforcement Learning},
+      author={Volodymyr Mnih and Koray Kavukcuoglu and David Silver and Alex Graves and Ioannis Antonoglou and Daan Wierstra and Martin Riedmiller},
+      year={2013},
+      eprint={1312.5602},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/1312.5602}, 
 }
 
-@misc{ba2016layernormalization,</br>
-      title={Layer Normalization}, </br>
-      author={Jimmy Lei Ba and Jamie Ryan Kiros and Geoffrey E. Hinton},</br>
-      year={2016},</br>
-      eprint={1607.06450},</br>
-      archivePrefix={arXiv},</br>
-      primaryClass={stat.ML},</br>
-      url={https://arxiv.org/abs/1607.06450}, </br>
+@misc{ba2016layernormalization,
+      title={Layer Normalization},
+      author={Jimmy Lei Ba and Jamie Ryan Kiros and Geoffrey E. Hinton},
+      year={2016},
+      eprint={1607.06450},
+      archivePrefix={arXiv},
+      primaryClass={stat.ML},
+      url={https://arxiv.org/abs/1607.06450},
 }
 
 ```
